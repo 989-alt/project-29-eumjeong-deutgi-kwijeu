@@ -1,0 +1,1076 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>음정 듣기 퀴즈 · Day 29</title>
+<meta name="description" content="초등 4~6학년 음감 기초 훈련. 한 음·두 음 비교·세 음 코드 듣고 맞추기. Tone.js 합성, 점수 즉시 표시." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --primary: #292524;
+    --primary-active: #0c0a09;
+    --ink: #0c0a09;
+    --body: #4e4e4e;
+    --body-strong: #292524;
+    --muted: #777169;
+    --muted-soft: #a8a29e;
+    --hairline: #e7e5e4;
+    --hairline-soft: #f0efed;
+    --hairline-strong: #d6d3d1;
+    --canvas: #f5f5f5;
+    --canvas-soft: #fafafa;
+    --surface-card: #ffffff;
+    --surface-strong: #f0efed;
+    --on-primary: #ffffff;
+    --g-mint: #a7e5d3;
+    --g-peach: #f4c5a8;
+    --g-lavender: #c8b8e0;
+    --g-sky: #a8c8e8;
+    --g-rose: #e8b8c4;
+    --semantic-error: #dc2626;
+    --semantic-success: #16a34a;
+    --display: 'EB Garamond', 'Georgia', 'Times New Roman', serif;
+    --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --shadow-soft: 0 4px 16px rgba(0,0,0,0.04);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: var(--sans);
+    background: var(--canvas);
+    color: var(--ink);
+    font-size: 16px;
+    line-height: 1.5;
+    letter-spacing: 0.16px;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  a { color: inherit; }
+
+  /* Atmospheric gradient orbs — pure decoration */
+  .atmosphere {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+  }
+  .orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(60px);
+    opacity: 0.55;
+    animation: drift 22s ease-in-out infinite alternate;
+  }
+  .orb-1 { width: 420px; height: 420px; top: -140px; left: -120px;
+    background: radial-gradient(circle, var(--g-lavender) 0%, transparent 70%); }
+  .orb-2 { width: 360px; height: 360px; top: 12%; right: -120px;
+    background: radial-gradient(circle, var(--g-mint) 0%, transparent 70%);
+    animation-duration: 28s; animation-delay: -8s; }
+  .orb-3 { width: 480px; height: 480px; bottom: -180px; left: 35%;
+    background: radial-gradient(circle, var(--g-peach) 0%, transparent 70%);
+    animation-duration: 26s; animation-delay: -14s; opacity: 0.45; }
+  .orb-4 { width: 300px; height: 300px; bottom: 18%; right: 8%;
+    background: radial-gradient(circle, var(--g-sky) 0%, transparent 70%);
+    animation-duration: 24s; animation-delay: -4s; opacity: 0.5; }
+  @keyframes drift {
+    from { transform: translate(0, 0) scale(1); }
+    to   { transform: translate(40px, -30px) scale(1.05); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .orb { animation: none; }
+  }
+
+  .page { position: relative; z-index: 1; max-width: 960px; margin: 0 auto; padding: 56px 24px 96px; }
+
+  /* Hero */
+  .hero {
+    text-align: center;
+    padding: 24px 8px 40px;
+  }
+  .eyebrow {
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: 0.96px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 16px;
+  }
+  .eyebrow .dot { display: inline-block; width: 6px; height: 6px; border-radius: 9999px;
+    background: var(--ink); vertical-align: middle; margin: 0 8px 2px; }
+  h1.display {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 56px;
+    line-height: 1.08;
+    letter-spacing: -1.2px;
+    margin: 0 0 16px;
+    color: var(--ink);
+  }
+  .hero p.sub {
+    font-size: 16px;
+    line-height: 1.5;
+    color: var(--body);
+    max-width: 540px;
+    margin: 0 auto;
+  }
+
+  /* Start overlay (unlock audio) */
+  .start-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(245,245,245,0.92);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    padding: 24px;
+  }
+  .start-overlay[hidden] { display: none; }
+  .start-card {
+    background: var(--surface-card);
+    border: 1px solid var(--hairline);
+    border-radius: 16px;
+    padding: 40px 32px;
+    text-align: center;
+    max-width: 460px;
+    box-shadow: var(--shadow-soft);
+  }
+  .start-card h2 {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 32px;
+    line-height: 1.13;
+    letter-spacing: -0.32px;
+    margin: 0 0 12px;
+    color: var(--ink);
+  }
+  .start-card p {
+    color: var(--body);
+    margin: 0 0 24px;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  /* Buttons */
+  .btn {
+    font-family: var(--sans);
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1;
+    border-radius: 9999px;
+    padding: 11px 22px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background 0.15s, color 0.15s, transform 0.05s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px;
+  }
+  .btn:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+  }
+  .btn-primary {
+    background: var(--primary);
+    color: var(--on-primary);
+  }
+  .btn-primary:hover { background: var(--primary-active); }
+  .btn-primary:active { transform: scale(0.98); }
+  .btn-outline {
+    background: transparent;
+    color: var(--ink);
+    border-color: var(--hairline-strong);
+  }
+  .btn-outline:hover { background: var(--surface-strong); }
+  .btn-tertiary {
+    background: transparent;
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 4px;
+    padding: 8px 4px;
+    min-height: 32px;
+  }
+  .btn-tertiary:hover { color: var(--primary-active); }
+
+  /* Control panel */
+  .panel {
+    background: var(--surface-card);
+    border: 1px solid var(--hairline);
+    border-radius: 16px;
+    padding: 24px;
+    margin-top: 24px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 28px 32px;
+    align-items: flex-end;
+    justify-content: space-between;
+  }
+  .panel-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+  }
+  .panel-group .seg { width: max-content; }
+  .panel-label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.96px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0;
+  }
+  .seg {
+    display: inline-flex;
+    border: 1px solid var(--hairline-strong);
+    border-radius: 9999px;
+    padding: 4px;
+    background: var(--canvas-soft);
+    gap: 2px;
+  }
+  .seg button {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1;
+    border: none;
+    background: transparent;
+    color: var(--ink);
+    padding: 9px 14px;
+    border-radius: 9999px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    min-height: 36px;
+    white-space: nowrap;
+  }
+  .seg button[aria-pressed="true"] {
+    background: var(--primary);
+    color: var(--on-primary);
+  }
+  .seg button:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+  }
+  .panel-reset {
+    align-self: flex-end;
+  }
+
+  /* Quiz card */
+  .quiz {
+    background: var(--surface-card);
+    border: 1px solid var(--hairline);
+    border-radius: 16px;
+    padding: 48px 32px;
+    margin-top: 24px;
+    text-align: center;
+  }
+  .play-btn {
+    width: 112px;
+    height: 112px;
+    border-radius: 9999px;
+    background: var(--primary);
+    color: var(--on-primary);
+    border: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 24px;
+    transition: background 0.15s, transform 0.05s;
+    box-shadow: var(--shadow-soft);
+  }
+  .play-btn:hover { background: var(--primary-active); }
+  .play-btn:active { transform: scale(0.96); }
+  .play-btn:focus-visible { outline: 3px solid var(--ink); outline-offset: 4px; }
+  .play-btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+  .play-btn svg { width: 36px; height: 36px; fill: currentColor; }
+
+  .quiz-caption {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.96px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 8px;
+  }
+  .quiz-prompt {
+    font-family: var(--sans);
+    font-size: 20px;
+    font-weight: 500;
+    line-height: 1.35;
+    color: var(--ink);
+    margin: 0 0 24px;
+  }
+
+  /* Choice grid */
+  .choices {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+    margin: 0 auto 8px;
+    max-width: 640px;
+  }
+  .choice {
+    font-family: var(--sans);
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 1;
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--hairline-strong);
+    border-radius: 9999px;
+    padding: 14px 22px;
+    cursor: pointer;
+    min-width: 72px;
+    min-height: 48px;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+  }
+  .choice:hover:not([disabled]) { background: var(--surface-strong); }
+  .choice:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .choice[disabled] { cursor: default; }
+  .choice.correct {
+    background: var(--g-mint);
+    border-color: var(--g-mint);
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .choice.wrong {
+    background: var(--g-rose);
+    border-color: var(--g-rose);
+    color: var(--ink);
+  }
+  .choice[disabled]:not(.correct):not(.wrong) { opacity: 0.5; }
+
+  /* Feedback */
+  .feedback {
+    margin-top: 28px;
+    min-height: 1px;
+  }
+  .feedback[hidden] { display: none; }
+  .feedback-result {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 32px;
+    line-height: 1.13;
+    letter-spacing: -0.32px;
+    margin: 0 0 4px;
+  }
+  .feedback-result.ok { color: var(--ink); }
+  .feedback-result.ok::before {
+    content: "";
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 9999px;
+    background: var(--semantic-success);
+    margin-right: 10px;
+    vertical-align: middle;
+    transform: translateY(-3px);
+  }
+  .feedback-result.ng { color: var(--ink); }
+  .feedback-result.ng::before {
+    content: "";
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 9999px;
+    background: var(--semantic-error);
+    margin-right: 10px;
+    vertical-align: middle;
+    transform: translateY(-3px);
+  }
+  .feedback-detail {
+    font-size: 15px;
+    color: var(--body);
+    margin: 0 0 20px;
+  }
+  .feedback-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  /* Score row */
+  .score {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    background: var(--surface-card);
+    border: 1px solid var(--hairline);
+    border-radius: 16px;
+    padding: 24px;
+    margin-top: 24px;
+  }
+  .score-cell {
+    text-align: center;
+  }
+  .score-cell .label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.96px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 6px;
+  }
+  .score-cell .value {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 32px;
+    line-height: 1.13;
+    letter-spacing: -0.32px;
+    color: var(--ink);
+    margin: 0;
+  }
+
+  /* Keyboard */
+  .keyboard-card {
+    background: var(--surface-card);
+    border: 1px solid var(--hairline);
+    border-radius: 16px;
+    padding: 24px;
+    margin-top: 24px;
+    text-align: center;
+  }
+  .keyboard-card h3 {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.96px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 14px;
+  }
+  .keyboard {
+    margin: 0 auto;
+    display: block;
+    max-width: 560px;
+    width: 100%;
+    height: auto;
+  }
+  .key-white {
+    fill: #ffffff;
+    stroke: var(--hairline-strong);
+    stroke-width: 1;
+    transition: fill 0.3s;
+  }
+  .key-white.lit {
+    fill: var(--g-mint);
+  }
+  .key-black {
+    fill: var(--ink);
+    transition: fill 0.3s;
+  }
+  .key-black.lit {
+    fill: var(--g-lavender);
+  }
+  .key-label {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 500;
+    fill: var(--muted);
+    text-anchor: middle;
+    pointer-events: none;
+  }
+
+  /* Footer */
+  footer {
+    text-align: center;
+    color: var(--body);
+    font-size: 15px;
+    line-height: 1.47;
+    letter-spacing: 0.15px;
+    padding: 56px 0 0;
+  }
+
+  /* Live region (visually hidden but announced) */
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* Mobile */
+  @media (max-width: 720px) {
+    .page { padding: 32px 16px 64px; }
+    h1.display { font-size: 36px; letter-spacing: -0.7px; }
+    .panel {
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+    .panel-reset { align-self: flex-start; }
+    .seg button { padding: 8px 10px; font-size: 13px; }
+    .quiz { padding: 32px 20px; }
+    .play-btn { width: 92px; height: 92px; }
+    .score { padding: 16px; gap: 8px; }
+    .score-cell .value { font-size: 24px; }
+    .feedback-result { font-size: 24px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="atmosphere" aria-hidden="true">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+  <div class="orb orb-4"></div>
+</div>
+
+<div class="page">
+  <header class="hero">
+    <p class="eyebrow">Ear Training<span class="dot"></span>음감 훈련</p>
+    <h1 class="display">음정 듣기 퀴즈</h1>
+    <p class="sub">소리만 듣고 어떤 음인지 맞춰 보세요. 한 음, 두 음 비교, 세 음 코드까지 — 난이도와 길이를 조절하며 천천히 음감을 키울 수 있어요.</p>
+  </header>
+
+  <section class="panel" aria-label="설정">
+    <div class="panel-group">
+      <p class="panel-label" id="lbl-diff">난이도</p>
+      <div class="seg" role="group" aria-labelledby="lbl-diff" id="seg-diff">
+        <button type="button" data-value="3" aria-pressed="true">3음 (도미솔)</button>
+        <button type="button" data-value="5" aria-pressed="false">5음</button>
+        <button type="button" data-value="7" aria-pressed="false">7음</button>
+      </div>
+    </div>
+    <div class="panel-group">
+      <p class="panel-label" id="lbl-mode">모드</p>
+      <div class="seg" role="group" aria-labelledby="lbl-mode" id="seg-mode">
+        <button type="button" data-value="single" aria-pressed="true">한 음</button>
+        <button type="button" data-value="compare" aria-pressed="false">두 음 비교</button>
+        <button type="button" data-value="chord" aria-pressed="false">세 음 코드</button>
+      </div>
+    </div>
+    <div class="panel-group">
+      <p class="panel-label" id="lbl-len">음 길이</p>
+      <div class="seg" role="group" aria-labelledby="lbl-len" id="seg-len">
+        <button type="button" data-value="0.6" aria-pressed="false">짧음</button>
+        <button type="button" data-value="1.0" aria-pressed="true">보통</button>
+        <button type="button" data-value="1.5" aria-pressed="false">김</button>
+      </div>
+    </div>
+    <div class="panel-reset">
+      <button type="button" id="btn-reset" class="btn btn-tertiary" aria-label="점수와 진행 초기화">초기화</button>
+    </div>
+  </section>
+
+  <section class="quiz" aria-label="문제">
+    <button type="button" id="play" class="play-btn" aria-label="음 다시 듣기">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+    </button>
+    <p class="quiz-caption" id="quiz-caption">문제 1</p>
+    <p class="quiz-prompt" id="quiz-prompt">이 음은 어떤 음일까요?</p>
+    <div id="choices" class="choices" role="group" aria-label="보기"></div>
+    <div id="feedback" class="feedback" hidden>
+      <p class="feedback-result" id="fb-result"></p>
+      <p class="feedback-detail" id="fb-detail"></p>
+      <div class="feedback-actions">
+        <button type="button" id="btn-replay" class="btn btn-outline">다시 듣기</button>
+        <button type="button" id="btn-next" class="btn btn-primary">다음 문제 →</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="score" aria-label="점수">
+    <div class="score-cell">
+      <p class="label">시도</p>
+      <p class="value" id="s-attempt">0</p>
+    </div>
+    <div class="score-cell">
+      <p class="label">정답</p>
+      <p class="value" id="s-correct">0</p>
+    </div>
+    <div class="score-cell">
+      <p class="label">정답률</p>
+      <p class="value" id="s-rate">—</p>
+    </div>
+  </section>
+
+  <section class="keyboard-card" aria-label="건반 시각화">
+    <h3>건반 (도~도)</h3>
+    <svg class="keyboard" viewBox="0 0 560 160" role="img" aria-label="1옥타브 건반. 정답 음이 강조됩니다.">
+      <!-- White keys C D E F G A B C -->
+      <g id="white-keys"></g>
+      <!-- Black keys C# D# F# G# A# -->
+      <g id="black-keys"></g>
+    </svg>
+  </section>
+
+  <footer>
+    Day 29 · 1일 1바이브코딩 · Design: <strong>ElevenLabs</strong> · Sound: Tone.js
+  </footer>
+</div>
+
+<div class="sr-only" id="live" role="status" aria-live="polite"></div>
+
+<div class="start-overlay" id="start-overlay">
+  <div class="start-card">
+    <h2>음정 듣기 퀴즈</h2>
+    <p>브라우저 정책에 따라 첫 번째 ▶ 버튼을 눌러 소리를 켜 주세요. 그 다음 문제가 자동으로 시작됩니다.</p>
+    <button type="button" id="btn-start" class="btn btn-primary" aria-label="시작하고 소리 켜기">
+      <svg viewBox="0 0 24 24" aria-hidden="true" style="width:16px;height:16px;fill:currentColor"><path d="M8 5v14l11-7z"/></svg>
+      시작하기
+    </button>
+  </div>
+</div>
+
+<script src="https://unpkg.com/tone@14.8.49/build/Tone.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  // ---------- Music data ----------
+  // C major scale, 7 white keys. Korean solfège names: 도 레 미 파 솔 라 시.
+  const NOTES = [
+    { name: '도', en: 'C',  pitch: 'C4',  midi: 60 },
+    { name: '레', en: 'D',  pitch: 'D4',  midi: 62 },
+    { name: '미', en: 'E',  pitch: 'E4',  midi: 64 },
+    { name: '파', en: 'F',  pitch: 'F4',  midi: 65 },
+    { name: '솔', en: 'G',  pitch: 'G4',  midi: 67 },
+    { name: '라', en: 'A',  pitch: 'A4',  midi: 69 },
+    { name: '시', en: 'B',  pitch: 'B4',  midi: 71 },
+    { name: '도(높)', en: 'C', pitch: 'C5', midi: 72 } // octave landing, used in keyboard only
+  ];
+  // Active pool by difficulty (indices into NOTES, restricted to first 7)
+  const POOLS = {
+    3: [0, 2, 4],          // 도 미 솔
+    5: [0, 1, 2, 4, 5],    // 도 레 미 솔 라
+    7: [0, 1, 2, 3, 4, 5, 6] // 도 레 미 파 솔 라 시
+  };
+
+  // Chord templates: intervals in semitones from root
+  // Root will be picked from POOLS so chord stays within keys we know.
+  // For chord mode we only use 3-tone groupings (3음 코드).
+  const CHORDS = {
+    major:     { intervals: [0, 4, 7],  label: '장3화음', desc: '밝게 울리는 도-미-솔 같은 코드' },
+    minor:     { intervals: [0, 3, 7],  label: '단3화음', desc: '어둡게 울리는 코드' },
+    diminished:{ intervals: [0, 3, 6],  label: '감3화음', desc: '긴장된 코드' },
+    sus4:      { intervals: [0, 5, 7],  label: 'sus4 코드', desc: '미해결 느낌의 코드' }
+  };
+
+  // ---------- State ----------
+  const state = {
+    difficulty: 3,
+    mode: 'single',      // 'single' | 'compare' | 'chord'
+    noteLen: 1.0,        // seconds
+    attempt: 0,
+    correct: 0,
+    questionNumber: 0,
+    currentQ: null,      // { type, payload, answer, answerLabel }
+    locked: false,       // after answer, prevent further choice clicks
+    audioReady: false,
+    synth: null,
+  };
+
+  // ---------- DOM ----------
+  const $ = (id) => document.getElementById(id);
+  const elPlay = $('play');
+  const elChoices = $('choices');
+  const elCaption = $('quiz-caption');
+  const elPrompt = $('quiz-prompt');
+  const elFeedback = $('feedback');
+  const elFbResult = $('fb-result');
+  const elFbDetail = $('fb-detail');
+  const elReplay = $('btn-replay');
+  const elNext = $('btn-next');
+  const elReset = $('btn-reset');
+  const elSAttempt = $('s-attempt');
+  const elSCorrect = $('s-correct');
+  const elSRate = $('s-rate');
+  const elLive = $('live');
+  const elStartOverlay = $('start-overlay');
+  const elStart = $('btn-start');
+
+  // ---------- Keyboard SVG ----------
+  function buildKeyboard() {
+    const whiteG = document.getElementById('white-keys');
+    const blackG = document.getElementById('black-keys');
+    const whiteW = 70, whiteH = 140;
+    const blackW = 42, blackH = 88;
+    const labels = ['도','레','미','파','솔','라','시','도'];
+    for (let i = 0; i < 8; i++) {
+      const x = i * whiteW;
+      const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      r.setAttribute('x', x);
+      r.setAttribute('y', 10);
+      r.setAttribute('width', whiteW - 2);
+      r.setAttribute('height', whiteH);
+      r.setAttribute('rx', 4);
+      r.setAttribute('class', 'key-white');
+      r.setAttribute('data-midi', NOTES[i].midi);
+      whiteG.appendChild(r);
+      const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      t.setAttribute('x', x + whiteW/2 - 1);
+      t.setAttribute('y', 10 + whiteH - 12);
+      t.setAttribute('class', 'key-label');
+      t.textContent = labels[i];
+      whiteG.appendChild(t);
+    }
+    // Black keys: positions relative to white-key indices
+    // C# between 0/1, D# between 1/2, F# between 3/4, G# 4/5, A# 5/6
+    const blackPositions = [
+      { afterWhite: 0, midi: 61 }, // C#
+      { afterWhite: 1, midi: 63 }, // D#
+      { afterWhite: 3, midi: 66 }, // F#
+      { afterWhite: 4, midi: 68 }, // G#
+      { afterWhite: 5, midi: 70 }, // A#
+    ];
+    blackPositions.forEach(b => {
+      const cx = (b.afterWhite + 1) * whiteW;
+      const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      r.setAttribute('x', cx - blackW/2);
+      r.setAttribute('y', 10);
+      r.setAttribute('width', blackW);
+      r.setAttribute('height', blackH);
+      r.setAttribute('rx', 3);
+      r.setAttribute('class', 'key-black');
+      r.setAttribute('data-midi', b.midi);
+      blackG.appendChild(r);
+    });
+  }
+
+  function lightKeys(midis, durationMs) {
+    const all = document.querySelectorAll('[data-midi]');
+    all.forEach(k => k.classList.remove('lit'));
+    midis.forEach(m => {
+      const el = document.querySelector(`[data-midi="${m}"]`);
+      if (el) el.classList.add('lit');
+    });
+    if (durationMs) {
+      setTimeout(() => {
+        midis.forEach(m => {
+          const el = document.querySelector(`[data-midi="${m}"]`);
+          if (el) el.classList.remove('lit');
+        });
+      }, durationMs);
+    }
+  }
+
+  // ---------- Audio ----------
+  async function ensureAudio() {
+    if (state.audioReady) return;
+    if (typeof Tone === 'undefined') {
+      throw new Error('Tone.js failed to load');
+    }
+    await Tone.start();
+    state.synth = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'triangle' },
+      envelope: { attack: 0.02, decay: 0.1, sustain: 0.7, release: 0.4 }
+    }).toDestination();
+    state.synth.volume.value = -8;
+    state.audioReady = true;
+  }
+
+  function pitchFromMidi(midi) {
+    const names = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+    const oct = Math.floor(midi / 12) - 1;
+    return names[midi % 12] + oct;
+  }
+
+  async function playQuestion() {
+    if (!state.currentQ) return;
+    try { await ensureAudio(); } catch (e) { return; }
+    if (!state.audioReady) return;
+    const q = state.currentQ;
+    const len = state.noteLen;
+    const now = Tone.now();
+    if (q.type === 'single') {
+      state.synth.triggerAttackRelease(pitchFromMidi(q.payload.midi), len, now);
+    } else if (q.type === 'compare') {
+      state.synth.triggerAttackRelease(pitchFromMidi(q.payload.midis[0]), len, now);
+      state.synth.triggerAttackRelease(pitchFromMidi(q.payload.midis[1]), len, now + len + 0.15);
+    } else if (q.type === 'chord') {
+      const pitches = q.payload.midis.map(pitchFromMidi);
+      state.synth.triggerAttackRelease(pitches, len * 1.4, now);
+    }
+  }
+
+  // ---------- Question generation ----------
+  function pickRandom(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  function buildSingle() {
+    const pool = POOLS[state.difficulty];
+    const idx = pickRandom(pool);
+    const note = NOTES[idx];
+    return {
+      type: 'single',
+      payload: { midi: note.midi },
+      answer: idx,
+      answerLabel: note.name
+    };
+  }
+
+  function buildCompare() {
+    const pool = POOLS[state.difficulty];
+    let a = pickRandom(pool);
+    let b = pickRandom(pool);
+    // 33% chance of same; otherwise different. If equal but we want diff sometimes, leave random.
+    const ma = NOTES[a].midi, mb = NOTES[b].midi;
+    let answer; // 'same' | 'up' | 'down'
+    if (ma === mb) answer = 'same';
+    else if (mb > ma) answer = 'up';
+    else answer = 'down';
+    const labelMap = { same: '같다', up: '올라감 ↑', down: '내려감 ↓' };
+    return {
+      type: 'compare',
+      payload: { midis: [ma, mb] },
+      answer,
+      answerLabel: labelMap[answer]
+    };
+  }
+
+  function buildChord() {
+    // Use available chord types based on difficulty
+    let chordKeys;
+    if (state.difficulty === 3) chordKeys = ['major', 'minor'];
+    else if (state.difficulty === 5) chordKeys = ['major', 'minor', 'sus4'];
+    else chordKeys = ['major', 'minor', 'sus4', 'diminished'];
+
+    const chosenKey = pickRandom(chordKeys);
+    const intervals = CHORDS[chosenKey].intervals;
+    // Choose a root within C4..G4 so chord stays within keyboard range
+    const rootCandidates = [60, 62, 64, 65, 67]; // C4, D4, E4, F4, G4
+    const root = pickRandom(rootCandidates);
+    const midis = intervals.map(iv => root + iv);
+    return {
+      type: 'chord',
+      payload: { midis, chord: chosenKey },
+      answer: chosenKey,
+      answerLabel: CHORDS[chosenKey].label,
+      choices: chordKeys
+    };
+  }
+
+  function nextQuestion() {
+    state.questionNumber += 1;
+    state.locked = false;
+    elFeedback.hidden = true;
+    elFbResult.className = 'feedback-result';
+    elFbResult.textContent = '';
+    elFbDetail.textContent = '';
+    // Clear keyboard highlights
+    document.querySelectorAll('[data-midi]').forEach(k => k.classList.remove('lit'));
+
+    if (state.mode === 'single') state.currentQ = buildSingle();
+    else if (state.mode === 'compare') state.currentQ = buildCompare();
+    else state.currentQ = buildChord();
+
+    renderQuiz();
+    // Auto-play the question after a brief delay so user hears it
+    setTimeout(() => playQuestion(), 250);
+  }
+
+  // ---------- Rendering ----------
+  function renderQuiz() {
+    elCaption.textContent = `문제 ${state.questionNumber}`;
+    elChoices.innerHTML = '';
+    const q = state.currentQ;
+    if (q.type === 'single') {
+      elPrompt.textContent = '이 음은 어떤 음일까요?';
+      const pool = POOLS[state.difficulty];
+      pool.forEach(idx => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'choice';
+        btn.textContent = NOTES[idx].name;
+        btn.setAttribute('data-key', String(idx));
+        btn.setAttribute('aria-label', `${NOTES[idx].name} (${NOTES[idx].en})`);
+        btn.addEventListener('click', () => onAnswer(idx));
+        elChoices.appendChild(btn);
+      });
+    } else if (q.type === 'compare') {
+      elPrompt.textContent = '두 번째 음이 첫 번째 음과 비교해 어떻게 들리나요?';
+      ['same', 'up', 'down'].forEach(k => {
+        const labelMap = { same: '같다', up: '올라감 ↑', down: '내려감 ↓' };
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'choice';
+        btn.textContent = labelMap[k];
+        btn.setAttribute('data-key', k);
+        btn.addEventListener('click', () => onAnswer(k));
+        elChoices.appendChild(btn);
+      });
+    } else {
+      elPrompt.textContent = '동시에 울린 세 음은 어떤 코드일까요?';
+      q.choices.forEach(k => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'choice';
+        btn.textContent = CHORDS[k].label;
+        btn.setAttribute('data-key', k);
+        btn.addEventListener('click', () => onAnswer(k));
+        elChoices.appendChild(btn);
+      });
+    }
+  }
+
+  // ---------- Answer flow ----------
+  function onAnswer(picked) {
+    if (state.locked) return;
+    state.locked = true;
+    const q = state.currentQ;
+    const isCorrect = (picked === q.answer);
+    state.attempt += 1;
+    if (isCorrect) state.correct += 1;
+    updateScore();
+
+    // Mark buttons
+    const buttons = elChoices.querySelectorAll('.choice');
+    buttons.forEach(b => {
+      b.disabled = true;
+      const key = b.getAttribute('data-key');
+      const keyVal = (q.type === 'single') ? Number(key) : key;
+      if (keyVal === q.answer) b.classList.add('correct');
+      else if (keyVal === picked && !isCorrect) b.classList.add('wrong');
+    });
+
+    // Light correct keys on mini-keyboard
+    let lit = [];
+    if (q.type === 'single') lit = [q.payload.midi];
+    else if (q.type === 'compare') lit = q.payload.midis;
+    else lit = q.payload.midis;
+    lightKeys(lit, 3000);
+
+    // Feedback text
+    elFeedback.hidden = false;
+    if (isCorrect) {
+      elFbResult.className = 'feedback-result ok';
+      elFbResult.textContent = '정답!';
+    } else {
+      elFbResult.className = 'feedback-result ng';
+      elFbResult.textContent = '오답';
+    }
+    let detail = '';
+    if (q.type === 'single') {
+      detail = `정답: ${q.answerLabel} (${NOTES[q.answer].en})`;
+    } else if (q.type === 'compare') {
+      const [a, b] = q.payload.midis;
+      const names = midiToKoreanName(a) + ' → ' + midiToKoreanName(b);
+      detail = `정답: ${q.answerLabel} · 들린 음 ${names}`;
+    } else {
+      const names = q.payload.midis.map(midiToKoreanName).join(' · ');
+      detail = `정답: ${q.answerLabel} · 들린 음 ${names}`;
+    }
+    elFbDetail.textContent = detail;
+
+    elLive.textContent = (isCorrect ? '정답입니다. ' : '오답입니다. ') + detail;
+    // Focus next button for keyboard flow
+    setTimeout(() => elNext.focus(), 60);
+  }
+
+  function midiToKoreanName(midi) {
+    const m = midi % 12;
+    const nameMap = { 0:'도', 2:'레', 4:'미', 5:'파', 7:'솔', 9:'라', 11:'시',
+                       1:'도#', 3:'레#', 6:'파#', 8:'솔#', 10:'라#' };
+    let label = nameMap[m] ?? '?';
+    if (midi >= 72) label += '(높)';
+    return label;
+  }
+
+  function updateScore() {
+    elSAttempt.textContent = String(state.attempt);
+    elSCorrect.textContent = String(state.correct);
+    if (state.attempt === 0) elSRate.textContent = '—';
+    else {
+      const pct = Math.round((state.correct / state.attempt) * 100);
+      elSRate.textContent = pct + '%';
+    }
+  }
+
+  function resetScore() {
+    state.attempt = 0;
+    state.correct = 0;
+    state.questionNumber = 0;
+    updateScore();
+    nextQuestion();
+    elLive.textContent = '점수가 초기화되었습니다.';
+  }
+
+  // ---------- Segmented controls ----------
+  function wireSegmented(groupId, onChange) {
+    const group = document.getElementById(groupId);
+    group.addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      [...group.querySelectorAll('button')].forEach(b => b.setAttribute('aria-pressed', 'false'));
+      btn.setAttribute('aria-pressed', 'true');
+      onChange(btn.dataset.value);
+    });
+    // Arrow key navigation
+    group.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      const buttons = [...group.querySelectorAll('button')];
+      const i = buttons.indexOf(document.activeElement);
+      if (i < 0) return;
+      const next = e.key === 'ArrowRight'
+        ? buttons[(i + 1) % buttons.length]
+        : buttons[(i - 1 + buttons.length) % buttons.length];
+      next.focus();
+      next.click();
+      e.preventDefault();
+    });
+  }
+
+  // ---------- Wire up ----------
+  function init() {
+    buildKeyboard();
+    wireSegmented('seg-diff', (v) => {
+      state.difficulty = Number(v);
+      nextQuestion();
+    });
+    wireSegmented('seg-mode', (v) => {
+      state.mode = v;
+      nextQuestion();
+    });
+    wireSegmented('seg-len', (v) => {
+      state.noteLen = Number(v);
+    });
+    elPlay.addEventListener('click', async () => {
+      await ensureAudio();
+      playQuestion();
+    });
+    elReplay.addEventListener('click', () => playQuestion());
+    elNext.addEventListener('click', () => nextQuestion());
+    elReset.addEventListener('click', () => resetScore());
+    elStart.addEventListener('click', async () => {
+      // Always dismiss overlay + render first question, even if audio fails.
+      // The big ▶ button can retry audio later (also a user gesture).
+      elStartOverlay.hidden = true;
+      try {
+        await ensureAudio();
+      } catch (err) {
+        console.warn('Audio init deferred:', err && err.message);
+      }
+      nextQuestion();
+    });
+    // Allow Enter on body to advance after answer
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && state.locked && !elFeedback.hidden) {
+        nextQuestion();
+      }
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>
